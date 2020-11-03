@@ -5,7 +5,6 @@ import org.apache.spark.sql.{DataFrame, SparkSession, functions}
 import org.junit.{Before, Test}
 import com.zhousf.hudi.util.HudiUtils._
 
-import scala.io.Source
 import scala.util.Random
 
 
@@ -28,12 +27,12 @@ class HudiDemo {
   val combineKey = "modify_at"
 
 
-  @Before def init: Unit = {
+  @Before def init(): Unit = {
     spark = SparkSessionBuilder.createSparkSession(getClass.getSimpleName)
   }
 
 
-  @Test def buildTestData: Unit = {
+  @Test def buildTestData(): Unit = {
     import java.io.PrintWriter
     // schema : id name class gender score
     val out = new PrintWriter(resourcePath + testFilePath)
@@ -47,7 +46,7 @@ class HudiDemo {
   }
 
 
-  @Test def writeDataToHudi = {
+  @Test def writeDataToHudi(): Unit = {
 
     val testFileDF: DataFrame = spark.createDataFrame(
       spark.sparkContext.textFile(resourcePath + testFilePath)
@@ -56,7 +55,7 @@ class HudiDemo {
           try {
             (ele(0).toInt, ele(1), ele(2), ele(3), ele(4).toInt)
           } catch {
-            case e: Exception => println(ele.mkString(" || "))
+            case e: Exception => println(ele.mkString(" || ") + "\n" + e.printStackTrace())
           }
           (ele(0).toInt, ele(1), ele(2), ele(3), ele(4).toInt)
         })
@@ -66,7 +65,7 @@ class HudiDemo {
     testFileDF
       .withColumn(combineKey, functions.lit(System.currentTimeMillis()))
       .write
-      .saveToHudi("upsert") // upsert insert bulk_insert delete
+      .saveToHudi("insert") // upsert insert bulk_insert delete
       //  .upsertToHudi
       //  .insertToHudi
       //  .bulkInsertToHudi
@@ -79,7 +78,7 @@ class HudiDemo {
   }
 
 
-  @Test def readDataFromHudi = {
+  @Test def readDataFromHudi(): Unit = {
 
     val snapshotDF = spark.read.hudiSnapShot(resourcePath + hudiTableName, partitionKey)
     snapshotDF.printSchema()

@@ -19,13 +19,13 @@ object HudiUtils {
   implicit class HiveSupport[T](hudiConfig: DataFrameWriter[T]) {
 
     /**
-      * @param hiveDataBaseName                hive数据库名
-      * @param hiveTableName                   hive表名
-      * @param hivePartitionFields             hive分区字段
-      * @param hivePartitionExtractorClassName 分区提取字段，本配置下默认hudi多分区字段分割符为反斜线
-      * @param hiveUserName                    hive 用户名
-      * @param hivePassword                    hive 密码
-      * @param hiveServer2URL                  connect to hive : jdbc:hive2://host:10000
+      * @param hiveDataBaseName                hive database name
+      * @param hiveTableName                   hive table name
+      * @param hivePartitionFields             hive partition key
+      * @param hivePartitionExtractorClassName The class to extract the partition fields
+      * @param hiveUserName                    hive user name
+      * @param hivePassword                    hive user password
+      * @param hiveServer2URL                  hiveserver2 uri,like jdbc:hive2://host:10000
       * @return
       */
     def syncToHive(
@@ -54,25 +54,27 @@ object HudiUtils {
     /**
       * hudi入口
       *
-      * @param upsertParallel 更新并行度，默认 1500
-      * @param insertParallel 插入并行度，默认 1500
+      * @param upsertParallel upsert parallel,default  1500
+      * @param insertParallel insert parallel,default 1500
+      * @param deleteParallel delete parallel,default 1500
       * @return
       */
-    def setHudiParallel(upsertParallel: Int = 1500, insertParallel: Int = 1500): DataFrameWriter[T] = {
+    def setHudiParallel(upsertParallel: Int = 1500, insertParallel: Int = 1500, deleteParallel: Int = 1500): DataFrameWriter[T] = {
       hudiConfig
         .option("hoodie.upsert.shuffle.parallelism", upsertParallel)
         .option("hoodie.insert.shuffle.parallelism", insertParallel)
+        .option("hoodie.delete.shuffle.parallelism", deleteParallel)
     }
 
     /**
       *
-      * @param cleanPolicy         清理策略，基于提交会文件版本，增量读取场景建议使用 KEEP_LATEST_COMMIT ，其他场景 KEEP_LATEST_FILE_VERSIONS
-      * @param asyncClean          异步清理
-      * @param inlineCompact       内联压缩
-      * @param minCommits          保留最小提交数
-      * @param maxCommits          保留最大提交数
-      * @param retainedCommit      清理保存的提交数
-      * @param retainedFileVersion 清理保留的文件版本数
+      * @param cleanPolicy         the clean policy, 'KEEP_LATEST_COMMIT' or 'KEEP_LATEST_FILE_VERSIONS'
+      * @param asyncClean          enable asynchronous cleanup
+      * @param inlineCompact       enable inline Compact
+      * @param minCommits          run a compaction every min delta commits
+      * @param maxCommits          run a compaction every max delta commits
+      * @param retainedCommit      keep the latest commit number
+      * @param retainedFileVersion keep the latest file version number
       * @return
       */
     def setHudiCompact(
@@ -85,27 +87,27 @@ object HudiUtils {
                         retainedFileVersion: Int = 3
                       ): DataFrameWriter[T] = {
       hudiConfig
-        .option("hoodie.cleaner.commits.retained", retainedCommit) // 提交保留 默认 10
-        .option("hoodie.keep.min.commits", minCommits) // 保存最小提交数 默认 20
-        .option("hoodie.keep.max.commits", maxCommits) // 保存最大提交数 默认 30
-        .option("hoodie.cleaner.policy", cleanPolicy) // 文件保存策略
-        .option("hoodie.cleaner.fileversions.retained", retainedFileVersion) // 文件版本保留 默认 3
-        .option("hoodie.cleaner.parallelism", "200") // 默认 200
-        .option("hoodie.clean.automatic", "true") // 自动清理 默认true
-        .option("hoodie.clean.async", asyncClean) // 异步清理 默认 false
-        .option("hoodie.compact.inline", inlineCompact) // 内联压缩 默认 false  降低性能
-        .option("hoodie.compact.inline.max.delta.commits", "5") // 内联 最大压缩值 默认 5
-        .option("hoodie.commits.archival.batch", minCommits / 2) // 归档数量 默认10
+        .option("hoodie.cleaner.commits.retained", retainedCommit)
+        .option("hoodie.keep.min.commits", minCommits)
+        .option("hoodie.keep.max.commits", maxCommits)
+        .option("hoodie.cleaner.policy", cleanPolicy)
+        .option("hoodie.cleaner.fileversions.retained", retainedFileVersion)
+        .option("hoodie.cleaner.parallelism", "200")
+        .option("hoodie.clean.automatic", "true")
+        .option("hoodie.clean.async", asyncClean)
+        .option("hoodie.compact.inline", inlineCompact)
+        .option("hoodie.compact.inline.max.delta.commits", "5")
+        .option("hoodie.commits.archival.batch", minCommits / 2)
     }
 
     /**
-      * @param tableName             hudi表名
-      * @param preCombineFields      合并时比较的字段 example:modify_time
-      * @param recordKeyFields       主键 unique, 多字段逗号分割 example: "timestamp,id"
-      * @param partitionPathFields   分区字段 ，多字段逗号分割 example: "ds,platform_type"
-      * @param tableType             hudi表类型，默认 merge_on_read
-      * @param keyGeneratorClassName 键值（分区字段）提取器  default = ComplexKeyGenerator
-      * @param hiveStylePartitioning hive分区格式  partitioin=xxx,default = true
+      * @param tableName             hudi table namt
+      * @param preCombineFields      merge comparison field, example:modify_time
+      * @param recordKeyFields       recordKey show be unique,example: "timestamp,id" or "timestamp"
+      * @param partitionPathFields   partitionKey ，example: "ds,platform_type" or "ds"
+      * @param tableType             hudi table type，example: 'merge_on_read' or 'copy_on_write'
+      * @param keyGeneratorClassName the class to extract the key fields  default = ComplexKeyGenerator
+      * @param hiveStylePartitioning enable hive style partitons file name
       * @return
       */
     def setHudiTableConfig(
@@ -129,10 +131,9 @@ object HudiUtils {
             classOf[SimpleKeyGenerator].getName)
 
         .option(HIVE_STYLE_PARTITIONING_OPT_KEY, hiveStylePartitioning)
-        .option(TABLE_TYPE_OPT_KEY, tableType) // merage_on_read  cope_on_write
-        // 当前数据的分区变更时，数据的分区目录也变化 全局GLOBAL_BLOOM
+        .option(TABLE_TYPE_OPT_KEY, tableType)
         .option(HoodieIndexConfig.BLOOM_INDEX_UPDATE_PARTITION_PATH, "true")
-        .option(HoodieIndexConfig.INDEX_TYPE_PROP, HoodieIndex.IndexType.GLOBAL_BLOOM.name())
+        .option(HoodieIndexConfig.INDEX_TYPE_PROP, HoodieIndex.IndexType.GLOBAL_BLOOM.name()) // index type GLOBAL_BLOOM
 
     }
 
@@ -156,7 +157,7 @@ object HudiUtils {
 
     /**
       * @param operateType   delete insert upsert(default value) buld_insert
-      * @param isHardDeletes 删除时可选项，默认true  硬删除
+      * @param isHardDeletes Soft Deletes or Hard Deletes , default Hard Deletes
       * @return
       */
     def saveToHudi(operateType: String = "upsert", isHardDeletes: Boolean = true): DataFrameWriter[T] = {
@@ -185,9 +186,9 @@ object HudiUtils {
       hudi.option(OPERATION_OPT_KEY, DELETE_OPERATION_OPT_VAL)
         .option(PAYLOAD_CLASS_OPT_KEY,
           if (isHardDeletes)
-            classOf[EmptyHoodieRecordPayload].getName // 软删除 保留键值
+            classOf[EmptyHoodieRecordPayload].getName
           else
-            classOf[OverwriteWithLatestAvroPayload].getName) // 硬删除
+            classOf[OverwriteWithLatestAvroPayload].getName)
     }
   }
 
@@ -202,13 +203,14 @@ object HudiUtils {
       stringBuilder.append(path)
       for (x <- partition.split(",").indices) {
         stringBuilder.append("/*")
+        x
       }
       stringBuilder.toString()
     }
 
     /**
-      * @param path         hudi表路径
-      * @param partitionKey 分区字段，多字段分区逗号分割,默认分区或单字段分区时不需要配置
+      * @param path         hudi table save path
+      * @param partitionKey partition keys
       * @return
       */
     def hudiSnapShot(path: String, partitionKey: String = ""): DataFrame = {
@@ -219,8 +221,8 @@ object HudiUtils {
     }
 
     /**
-      * @param path         hudi表路径
-      * @param partitionKey 分区字段，多字段分区逗号分割,默认分区或单字段分区时不需要配置
+      * @param path         hudi table path
+      * @param partitionKey partition keys
       * @return
       */
     def hudiOptimized(path: String, partitionKey: String = ""): DataFrame = {
@@ -230,11 +232,11 @@ object HudiUtils {
     }
 
     /**
-      * @param path            hudi表路径
-      * @param beginCommitTime 起始时间轴,14位，年月日时分秒 - yyyyMMddHHmmss
+      * @param path            hudi table path
+      * @param beginCommitTime start time, 14bit yyyyMMddHHmmss
       *                        example: '20170901080000' will get all new data written after Sep 1, 2017 08:00AM.
-      * @param partitionPath   从指定的分区增量拉取,多路径使用反斜线分割，*代表全匹配  example: '/year=2020/month=*\/'
-      * @param endCommitTime   结束时间轴，默认最新提交时间
+      * @param partitionPath   filter the partition path,  example: '/year=2020/month=*\/'
+      * @param endCommitTime   end time , default value is latest commit time
       * @return
       */
     def hudiIncrement(
