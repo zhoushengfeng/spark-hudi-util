@@ -95,7 +95,7 @@ object HudiUtils {
         .option("hoodie.clean.async", asyncClean) // 异步清理 默认 false
         .option("hoodie.compact.inline", inlineCompact) // 内联压缩 默认 false  降低性能
         .option("hoodie.compact.inline.max.delta.commits", "5") // 内联 最大压缩值 默认 5
-        .option("hoodie.commits.archival.batch", minCommits/2) // 归档数量 默认10
+        .option("hoodie.commits.archival.batch", minCommits / 2) // 归档数量 默认10
     }
 
     /**
@@ -109,14 +109,14 @@ object HudiUtils {
       * @return
       */
     def setHudiTableConfig(
-                    tableName: String,
-                    preCombineFields: String,
-                    recordKeyFields: String,
-                    partitionPathFields: String = DEFAULT_PARTITIONPATH_FIELD_OPT_VAL,
-                    tableType: String = HoodieTableType.MERGE_ON_READ.name,
-                    keyGeneratorClassName: String = classOf[ComplexKeyGenerator].getName,
-                    hiveStylePartitioning: Boolean = true
-                  ): DataFrameWriter[T] = {
+                            tableName: String,
+                            preCombineFields: String,
+                            recordKeyFields: String,
+                            partitionPathFields: String = DEFAULT_PARTITIONPATH_FIELD_OPT_VAL,
+                            tableType: String = HoodieTableType.MERGE_ON_READ.name,
+                            keyGeneratorClassName: String = classOf[ComplexKeyGenerator].getName,
+                            hiveStylePartitioning: Boolean = true
+                          ): DataFrameWriter[T] = {
       hudiConfig
         .option(TABLE_NAME, tableName)
         .option(PRECOMBINE_FIELD_OPT_KEY, preCombineFields)
@@ -147,10 +147,10 @@ object HudiUtils {
   }
 
 
-  implicit class WriteToHudi[T](df: Dataset[T]) {
+  implicit class WriteToHudi[T](writer: DataFrameWriter[T]) {
 
     private def hudi: DataFrameWriter[T] = {
-      df.write.format("org.apache.hudi").mode(SaveMode.Append)
+      writer.format("org.apache.hudi").mode(SaveMode.Append)
     }
 
 
@@ -191,16 +191,8 @@ object HudiUtils {
     }
   }
 
-  implicit class ReadHudi[T](sparkSession: SparkSession) {
 
-    def hudi: DataFrameReader = {
-      sparkSession
-        .read
-        .format("org.apache.hudi")
-    }
-  }
-
-  implicit class ReadFromHudi[T](dataFrameReader: DataFrameReader) {
+  implicit class ReadFromHudi[T](reader: DataFrameReader) {
 
     private def buildPartitionPath(path: String, partition: String): String = {
       if (path == null || path.trim == "") {
@@ -219,8 +211,9 @@ object HudiUtils {
       * @param partitionKey 分区字段，多字段分区逗号分割,默认分区或单字段分区时不需要配置
       * @return
       */
-    def readSnapShot(path: String, partitionKey: String = ""): DataFrame = {
-      dataFrameReader
+    def hudiSnapShot(path: String, partitionKey: String = ""): DataFrame = {
+
+      reader.format("org.apache.hudi")
         .option(QUERY_TYPE_OPT_KEY, QUERY_TYPE_SNAPSHOT_OPT_VAL)
         .load(buildPartitionPath(path, partitionKey))
     }
@@ -230,8 +223,8 @@ object HudiUtils {
       * @param partitionKey 分区字段，多字段分区逗号分割,默认分区或单字段分区时不需要配置
       * @return
       */
-    def readOptimized(path: String, partitionKey: String = ""): DataFrame = {
-      dataFrameReader
+    def hudiOptimized(path: String, partitionKey: String = ""): DataFrame = {
+      reader.format("org.apache.hudi")
         .option(QUERY_TYPE_OPT_KEY, QUERY_TYPE_READ_OPTIMIZED_OPT_VAL)
         .load(buildPartitionPath(path, partitionKey))
     }
@@ -244,13 +237,13 @@ object HudiUtils {
       * @param endCommitTime   结束时间轴，默认最新提交时间
       * @return
       */
-    def readIncrement(
+    def hudiIncrement(
                        path: String,
                        beginCommitTime: String,
                        partitionPath: Option[String] = Option.empty,
                        endCommitTime: Option[String] = Option.empty
                      ): DataFrame = {
-      dataFrameReader
+      reader.format("org.apache.hudi")
         .option(QUERY_TYPE_OPT_KEY, QUERY_TYPE_INCREMENTAL_OPT_VAL)
         .option(BEGIN_INSTANTTIME_OPT_KEY, beginCommitTime)
         .option(INCR_PATH_GLOB_OPT_KEY, partitionPath.getOrElse(""))

@@ -65,6 +65,7 @@ class HudiDemo {
 
     testFileDF
       .withColumn(combineKey, functions.lit(System.currentTimeMillis()))
+      .write
       .saveToHudi("upsert") // upsert insert bulk_insert delete
       //  .upsertToHudi
       //  .insertToHudi
@@ -80,19 +81,18 @@ class HudiDemo {
 
   @Test def readDataFromHudi = {
 
-    val snapshotDF = spark.hudi.readSnapShot(resourcePath + hudiTableName, partitionKey)
+    val snapshotDF = spark.read.hudiSnapShot(resourcePath + hudiTableName, partitionKey)
     snapshotDF.printSchema()
     snapshotDF.show(false)
 
-    val optimizedDF = spark.hudi.readOptimized(resourcePath + hudiTableName, partitionKey)
+    val optimizedDF = spark.read.hudiOptimized(resourcePath + hudiTableName, partitionKey)
     optimizedDF.printSchema()
     optimizedDF.show(false)
 
     // Incremental view not implemented yet, for merge-on-read tables
-    val incrementDF = spark.hudi.readIncrement(resourcePath + hudiTableName, "20201026120000")
+    val incrementDF = spark.read.hudiIncrement(resourcePath + hudiTableName, "20201026120000")
     incrementDF.printSchema()
     incrementDF.show(false)
-
 
   }
 
