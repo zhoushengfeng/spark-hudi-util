@@ -201,9 +201,8 @@ object HudiUtils {
       }
       val stringBuilder = new StringBuilder()
       stringBuilder.append(path)
-      for (x <- partition.split(",").indices) {
-        stringBuilder.append("/*")
-        x
+      for (x <- partition.split(",")) {
+        if(x.matches("^[a-zA-Z0-9]+=[a-zA-Z0-9]+$")) stringBuilder.append(s"/$x") else stringBuilder.append("/*")
       }
       stringBuilder.toString()
     }
