@@ -3,7 +3,7 @@ package com.zhousf.hudi.util
 import org.apache.hudi.DataSourceReadOptions._
 import org.apache.hudi.DataSourceWriteOptions._
 import org.apache.hudi.common.model.{EmptyHoodieRecordPayload, HoodieCleaningPolicy, HoodieTableType, OverwriteWithLatestAvroPayload}
-import org.apache.hudi.config.HoodieIndexConfig
+import org.apache.hudi.config.{HoodieIndexConfig, HoodieWriteConfig}
 import org.apache.hudi.config.HoodieWriteConfig.TABLE_NAME
 import org.apache.hudi.hive.MultiPartKeysValueExtractor
 import org.apache.hudi.index.HoodieIndex
@@ -108,6 +108,7 @@ object HudiUtils {
       * @param tableType             hudi table type，example: 'merge_on_read' or 'copy_on_write'
       * @param keyGeneratorClassName the class to extract the key fields  default = ComplexKeyGenerator
       * @param hiveStylePartitioning enable hive style partitons file name
+      * @param allowedAddColumns     Whether columns are allowed to be added
       * @return
       */
     def setHudiTableConfig(
@@ -117,7 +118,8 @@ object HudiUtils {
                             partitionPathFields: String = DEFAULT_PARTITIONPATH_FIELD_OPT_VAL,
                             tableType: String = HoodieTableType.MERGE_ON_READ.name,
                             keyGeneratorClassName: String = classOf[ComplexKeyGenerator].getName,
-                            hiveStylePartitioning: Boolean = true
+                            hiveStylePartitioning: Boolean = true,
+                            allowedAddColumns: Boolean = true
                           ): DataFrameWriter[T] = {
       hudiConfig
         .option(TABLE_NAME, tableName)
@@ -134,6 +136,7 @@ object HudiUtils {
         .option(TABLE_TYPE_OPT_KEY, tableType)
         .option(HoodieIndexConfig.BLOOM_INDEX_UPDATE_PARTITION_PATH, "true")
         .option(HoodieIndexConfig.INDEX_TYPE_PROP, HoodieIndex.IndexType.GLOBAL_BLOOM.name()) // index type GLOBAL_BLOOM
+        .option(HoodieWriteConfig.EXTERNAL_RECORD_AND_SCHEMA_TRANSFORMATION, allowedAddColumns)
 
     }
 
@@ -202,7 +205,7 @@ object HudiUtils {
       val stringBuilder = new StringBuilder()
       stringBuilder.append(path)
       for (x <- partition.split(",")) {
-        if(x.matches("^[a-zA-Z0-9]+=[a-zA-Z0-9]+$")) stringBuilder.append(s"/$x") else stringBuilder.append("/*")
+        if (x.matches("^[a-zA-Z0-9]+=[a-zA-Z0-9]+$")) stringBuilder.append(s"/$x") else stringBuilder.append("/*")
       }
       stringBuilder.toString()
     }
